@@ -74,9 +74,10 @@
         state.transactions = res.data || [];
         state.sheetUrl = res.sheetUrl || '';
         if (state.sheetUrl) {
-          var link = document.getElementById('sheetLink');
-          link.href = state.sheetUrl;
-          link.style.display = 'flex';
+          ['sheetLink', 'sheetLinkDesktop'].forEach(function (id) {
+            var link = document.getElementById(id);
+            if (link) { link.href = state.sheetUrl; link.style.display = 'flex'; }
+          });
         }
       }
       renderAll();
@@ -106,6 +107,7 @@
     renderBalance();
     renderList();
     renderRecap();
+    renderSidePanel();
   }
 
   function renderBalance() {
@@ -117,6 +119,51 @@
     document.getElementById('totalBalance').textContent = formatRupiah(totalIncome - totalExpense);
     document.getElementById('sumIncome').textContent = formatRupiah(totalIncome);
     document.getElementById('sumExpense').textContent = formatRupiah(totalExpense);
+  }
+
+  // Mengisi panel samping (desktop) dengan ringkasan bulan ini & kategori teratas
+  function renderSidePanel() {
+    var miniIncomeEl = document.getElementById('miniIncome');
+    var miniExpenseEl = document.getElementById('miniExpense');
+    var miniNetEl = document.getElementById('miniNet');
+    var miniTopCatEl = document.getElementById('miniTopCategory');
+    if (!miniIncomeEl || !miniExpenseEl || !miniNetEl || !miniTopCatEl) return;
+
+    var now = new Date();
+    var monthList = state.transactions.filter(function (t) {
+      var d = new Date(t.tanggal);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+
+    var income = 0, expense = 0;
+    var catTotals = {};
+    monthList.forEach(function (t) {
+      if (t.tipe === 'income') {
+        income += Number(t.jumlah);
+      } else {
+        expense += Number(t.jumlah);
+        var cat = t.kategori || 'Lainnya';
+        catTotals[cat] = (catTotals[cat] || 0) + Number(t.jumlah);
+      }
+    });
+
+    miniIncomeEl.textContent = formatRupiah(income);
+    miniExpenseEl.textContent = formatRupiah(expense);
+    miniNetEl.textContent = formatRupiah(income - expense);
+
+    var cats = Object.keys(catTotals).sort(function (a, b) { return catTotals[b] - catTotals[a]; });
+    if (!cats.length) {
+      miniTopCatEl.innerHTML = '<p class="muted-text">Belum ada data.</p>';
+    } else {
+      miniTopCatEl.innerHTML = cats.slice(0, 3).map(function (c) {
+        return (
+          '<div class="mini-stat">' +
+            '<span class="mini-stat-label">' + escapeHtml(c) + '</span>' +
+            '<span class="mini-stat-value expense">' + formatRupiah(catTotals[c]) + '</span>' +
+          '</div>'
+        );
+      }).join('');
+    }
   }
 
   function renderList() {
@@ -427,8 +474,25 @@
   function showPage(page) {
     document.getElementById('pageHome').style.display = page === 'home' ? 'block' : 'none';
     document.getElementById('pageRecap').style.display = page === 'recap' ? 'block' : 'none';
-    document.getElementById('navHome').classList.toggle('active', page === 'home');
-    document.getElementById('navRecap').classList.toggle('active', page === 'recap');
+
+    // Ada beberapa tombol nav: sidebar desktop + bottom-nav mobile,
+    // semuanya memakai atribut data-nav, jadi update semuanya sekaligus.
+    document.querySelectorAll('[data-nav]').forEach(function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-nav') === page);
+    });
+
+    var titleEl = document.getElementById('pageTitle');
+    var subEl = document.getElementById('pageSubtitle');
+    if (titleEl && subEl) {
+      if (page === 'home') {
+        titleEl.textContent = 'Beranda';
+        subEl.textContent = 'Ringkasan saldo & riwayat transaksi Anda';
+      } else {
+        titleEl.textContent = 'Rekap';
+        subEl.textContent = 'Ringkasan pemasukan & pengeluaran Anda';
+      }
+    }
+
     if (page === 'recap') renderRecap();
   }
 
@@ -436,13 +500,19 @@
   document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('inpTanggal').value = todayISO();
 
-    document.getElementById('navHome').addEventListener('click', function () { showPage('home'); });
-    document.getElementById('navRecap').addEventListener('click', function () { showPage('recap'); });
-
-    document.getElementById('fabAdd').addEventListener('click', function () {
-      resetForm();
-      openOverlay('overlayForm');
+    // Navigasi (sidebar desktop + bottom-nav mobile), semua pakai data-nav
+    document.querySelectorAll('[data-nav]').forEach(function (btn) {
+      btn.addEventListener('click', function () { showPage(btn.getAttribute('data-nav')); });
     });
+
+    // Tombol tambah transaksi (sidebar, topbar, FAB mobile), semua pakai data-add-btn
+    document.querySelectorAll('[data-add-btn]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        resetForm();
+        openOverlay('overlayForm');
+      });
+    });
+
     document.getElementById('closeForm').addEventListener('click', function () { closeOverlay('overlayForm'); });
     document.getElementById('overlayForm').addEventListener('click', function (e) {
       if (e.target.id === 'overlayForm') closeOverlay('overlayForm');
