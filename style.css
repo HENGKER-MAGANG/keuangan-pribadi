@@ -265,14 +265,29 @@ img { max-width: 100%; }
 }
 .side-panel-title i { color: var(--c-primary); font-size: 1.05rem; }
 .side-panel-title.small { font-size: .78rem; margin-bottom: 1.1rem; }
-.mini-stat { display: flex; justify-content: space-between; align-items: center; padding: 13px 2px; border-bottom: 1px solid var(--c-border); }
-.mini-stat:first-of-type { padding-top: 2px; }
-.mini-stat:last-of-type { border-bottom: none; padding-bottom: 2px; }
+.mini-stat-group { display: flex; flex-direction: column; }
+.mini-stat { display: flex; justify-content: space-between; align-items: center; padding: 12px 2px; border-bottom: 1px solid var(--c-border); }
+.mini-stat-group .mini-stat:first-child { padding-top: 2px; }
+.mini-stat-group .mini-stat:last-child { border-bottom: none; padding-bottom: 2px; }
 .mini-stat-label { font-size: .8rem; color: var(--c-muted); font-weight: 600; }
 .mini-stat-value { font-family: var(--font-mono); font-size: .9rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--c-ink); }
 .mini-stat-value.income { color: var(--c-income-text); }
 .mini-stat-value.expense { color: var(--c-expense-text); }
-.side-panel-divider { height: 1px; background: var(--c-border); margin: 1.4rem 0; }
+
+/* Baris "Selisih" tampil sebagai hasil akhir yang ditonjolkan,
+   bukan cuma baris list biasa — supaya panel ini tidak terasa
+   seperti kartu generik berisi daftar label/nilai. */
+.mini-stat.net {
+  background: var(--c-primary-soft);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-top: 10px;
+  border-bottom: none !important;
+}
+.mini-stat.net .mini-stat-label { color: var(--c-primary-dk); font-weight: 700; }
+.mini-stat.net .mini-stat-value { color: var(--c-primary-dk); font-size: 1.02rem; }
+
+.side-panel-divider { height: 1px; background: var(--c-border); margin: 1.2rem 0; }
 .mini-top-cat .cat-row { display: flex; justify-content: space-between; font-size: .8rem; font-weight: 600; padding: 8px 2px; }
 .mini-top-cat .cat-row .cn { color: var(--c-ink); }
 .mini-top-cat .cat-row .cv { font-family: var(--font-mono); color: var(--c-expense-text); font-variant-numeric: tabular-nums; }
