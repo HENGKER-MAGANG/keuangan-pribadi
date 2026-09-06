@@ -7,13 +7,31 @@
     transactions: [],
     sheetUrl: '',
     filter: 'all',
-    pendingPhoto: null, // base64
+    pendingPhoto: null,
     currentType: 'income',
     detailId: null,
     loading: false
   };
 
-  // ---------- Helpers ----------
+  window.__onProofImgError = function (img) {
+    var div = document.createElement('div');
+    div.className = 'proof-thumb empty';
+    div.innerHTML = '<i class="ti ti-photo-off"></i>';
+    if (img.parentNode) img.parentNode.replaceChild(div, img);
+  };
+
+  window.__onDetailImgError = function (img) {
+    img.style.display = 'none';
+  };
+
+  function normalizeFotoUrl(url) {
+    if (!url) return '';
+    var s = String(url).trim();
+    var m = s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || s.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (m && m[1]) return 'https://lh3.googleusercontent.com/d/' + m[1];
+    return s;
+  }
+
   function formatRupiah(n) {
     n = Number(n) || 0;
     return 'Rp ' + Math.round(n).toLocaleString('id-ID');
@@ -22,31 +40,66 @@
     var d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
-  function formatDateHuman(iso) {
-    var d = new Date(iso);
-    if (isNaN(d.getTime())) return iso;
+
+  function parseTanggal(value) {
+    if (!value) return new Date(NaN);
+    if (value instanceof Date) return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+    var s = String(value).trim();
+
+    var iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+
+    var dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (dmy) return new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
+
+    return new Date(s);
+  }
+
+  function formatDateHuman(value) {
+    var d = parseTanggal(value);
+    if (isNaN(d.getTime())) return String(value);
     return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
   }
   function isSameDay(a, b) { return a.toDateString() === b.toDateString(); }
   function startOfWeek(d) {
     var date = new Date(d);
     var day = date.getDay();
-    var diff = (day === 0 ? -6 : 1) - day; // senin sebagai awal minggu
+    var diff = (day === 0 ? -6 : 1) - day;
     date.setDate(date.getDate() + diff);
     date.setHours(0, 0, 0, 0);
     return date;
   }
 
   function showToast(msg, type) {
-    var el = document.getElementById('toast');
-    el.className = 'flash show ' + (type || 'success');
-    var icon = type === 'error' ? 'ti-alert-circle' : (type === 'info' ? 'ti-info-circle' : 'ti-circle-check');
-    el.innerHTML = '<i class="ti ' + icon + '"></i><span>' + msg + '</span>';
+    type = type || 'success';
+    var toastEl = document.getElementById('toast');
+    var iconEl = document.getElementById('toastIcon');
+    var msgEl = document.getElementById('toastMsg');
+    var progressEl = document.getElementById('toastProgress');
+
+    var iconClass = type === 'error' ? 'ti-alert-circle' : (type === 'info' ? 'ti-info-circle' : 'ti-circle-check');
+
+    toastEl.classList.remove('show', 'animate-progress', 'success', 'error', 'info');
+    progressEl.classList.remove('animate-progress');
+    iconEl.className = 'ti ' + iconClass;
+    msgEl.textContent = msg;
+
+    toastEl.classList.add(type);
+    void toastEl.offsetWidth;
+
+    requestAnimationFrame(function () {
+      toastEl.classList.add('show');
+      requestAnimationFrame(function () {
+        progressEl.classList.add('animate-progress');
+      });
+    });
+
     clearTimeout(showToast._t);
-    showToast._t = setTimeout(function () { el.classList.remove('show'); }, 2600);
+    showToast._t = setTimeout(function () {
+      toastEl.classList.remove('show');
+    }, 2800);
   }
 
-  // ---------- API ----------
   function apiList() {
     if (!SCRIPT_URL || SCRIPT_URL.indexOf('PASTE_URL') > -1) {
       showToast('Isi dulu SCRIPT_URL di config.js', 'error');
@@ -54,7 +107,7 @@
     }
     return fetch(SCRIPT_URL + '?action=list&t=' + Date.now())
       .then(function (r) { return r.json(); })
-      .catch(function (err) {
+      .catch(function () {
         showToast('Gagal memuat data. Cek koneksi / SCRIPT_URL.', 'error');
         return { success: false, data: [] };
       });
@@ -63,7 +116,7 @@
   function apiPost(payload) {
     return fetch(SCRIPT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // hindari CORS preflight
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload)
     }).then(function (r) { return r.json(); });
   }
@@ -84,25 +137,23 @@
     });
   }
 
-  // ---------- Filtering ----------
   function filteredTransactions() {
     var now = new Date();
     var list = state.transactions.slice();
     if (state.filter === 'today') {
-      list = list.filter(function (t) { return isSameDay(new Date(t.tanggal), now); });
+      list = list.filter(function (t) { return isSameDay(parseTanggal(t.tanggal), now); });
     } else if (state.filter === 'week') {
       var sow = startOfWeek(now);
-      list = list.filter(function (t) { return new Date(t.tanggal) >= sow; });
+      list = list.filter(function (t) { return parseTanggal(t.tanggal) >= sow; });
     } else if (state.filter === 'month') {
       list = list.filter(function (t) {
-        var d = new Date(t.tanggal);
+        var d = parseTanggal(t.tanggal);
         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       });
     }
     return list;
   }
 
-  // ---------- Rendering: Home ----------
   function renderAll() {
     renderBalance();
     renderList();
@@ -121,7 +172,6 @@
     document.getElementById('sumExpense').textContent = formatRupiah(totalExpense);
   }
 
-  // Mengisi panel samping (desktop) dengan ringkasan bulan ini & kategori teratas
   function renderSidePanel() {
     var miniIncomeEl = document.getElementById('miniIncome');
     var miniExpenseEl = document.getElementById('miniExpense');
@@ -131,7 +181,7 @@
 
     var now = new Date();
     var monthList = state.transactions.filter(function (t) {
-      var d = new Date(t.tanggal);
+      var d = parseTanggal(t.tanggal);
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     });
 
@@ -179,8 +229,9 @@
     wrap.innerHTML = list.map(function (t) {
       var isIncome = t.tipe === 'income';
       var iconCat = isIncome ? 'ti-arrow-down-circle' : 'ti-arrow-up-circle';
-      var thumb = t.fotoUrl
-        ? '<img class="proof-thumb" src="' + t.fotoUrl + '" alt="bukti" />'
+      var fotoUrl = normalizeFotoUrl(t.fotoUrl);
+      var thumb = fotoUrl
+        ? '<img class="proof-thumb" src="' + fotoUrl + '" alt="bukti" onerror="window.__onProofImgError(this)" />'
         : '<div class="proof-thumb empty"><i class="ti ti-photo-off"></i></div>';
       return (
         '<div class="txn-item ' + (isIncome ? 'income' : 'expense') + '" data-id="' + t.id + '">' +
@@ -208,11 +259,10 @@
     });
   }
 
-  // ---------- Rendering: Recap ----------
   function renderRecap() {
     var now = new Date();
     var monthList = state.transactions.filter(function (t) {
-      var d = new Date(t.tanggal);
+      var d = parseTanggal(t.tanggal);
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     });
     var income = 0, expense = 0;
@@ -229,7 +279,6 @@
     document.getElementById('recapExpense').textContent = formatRupiah(expense);
     document.getElementById('recapNet').textContent = formatRupiah(income - expense);
 
-    // Kategori bars
     var catBox = document.getElementById('categoryBars');
     var cats = Object.keys(catTotals).sort(function (a, b) { return catTotals[b] - catTotals[a]; });
     if (!cats.length) {
@@ -247,7 +296,6 @@
       }).join('');
     }
 
-    // Trend 7 hari
     var days = [];
     for (var i = 6; i >= 0; i--) {
       var d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0);
@@ -257,7 +305,7 @@
     var dayTotals = days.map(function (d) {
       var inc = 0, exp = 0;
       state.transactions.forEach(function (t) {
-        var td = new Date(t.tanggal);
+        var td = parseTanggal(t.tanggal);
         if (isSameDay(td, d)) {
           if (t.tipe === 'income') inc += Number(t.jumlah); else exp += Number(t.jumlah);
         }
@@ -281,15 +329,15 @@
     }).join('');
   }
 
-  // ---------- Detail / Delete ----------
   function openDetail(id) {
     var t = state.transactions.find(function (x) { return x.id === id; });
     if (!t) return;
     state.detailId = id;
     var isIncome = t.tipe === 'income';
+    var fotoUrl = normalizeFotoUrl(t.fotoUrl);
     var body = document.getElementById('detailBody');
     body.innerHTML =
-      (t.fotoUrl ? '<img class="detail-photo" src="' + t.fotoUrl + '" alt="bukti" />' : '') +
+      (fotoUrl ? '<img class="detail-photo" src="' + fotoUrl + '" alt="bukti" onerror="window.__onDetailImgError(this)" />' : '') +
       '<div class="detail-row"><span class="dl">Tipe</span><span class="dv" style="color:' + (isIncome ? 'var(--c-income-text)' : 'var(--c-expense-text)') + '">' + (isIncome ? 'Pemasukan' : 'Pengeluaran') + '</span></div>' +
       '<div class="detail-row"><span class="dl">Jumlah</span><span class="dv">' + formatRupiah(t.jumlah) + '</span></div>' +
       '<div class="detail-row"><span class="dl">Keterangan</span><span class="dv">' + escapeHtml(t.keterangan || '-') + '</span></div>' +
@@ -315,11 +363,9 @@
     });
   }
 
-  // ---------- Overlay helpers ----------
   function openOverlay(id) { document.getElementById(id).classList.add('open'); }
   function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
 
-  // ---------- Form: Tambah Transaksi ----------
   function resetForm() {
     document.getElementById('inpJumlah').value = '';
     document.getElementById('inpKeterangan').value = '';
@@ -406,37 +452,62 @@
     });
   }
 
-  // ---------- Kamera langsung di web ----------
   var cameraStream = null;
 
   function openCamera() {
     var modal = document.getElementById('cameraModal');
     var video = document.getElementById('cameraVideo');
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      showToast('Kamera tidak didukung, gunakan "Dari Galeri"', 'info');
+
+    if (!window.isSecureContext) {
+      showToast('Kamera butuh koneksi HTTPS. Gunakan "Dari Galeri" saja.', 'error');
       return;
     }
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showToast('Kamera tidak didukung di browser ini, gunakan "Dari Galeri"', 'info');
+      return;
+    }
+
+    closeCamera();
+
+    function start(constraints) {
+      return navigator.mediaDevices.getUserMedia(constraints);
+    }
+
+    start({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+      .catch(function () {
+        return start({ video: true, audio: false });
+      })
       .then(function (stream) {
         cameraStream = stream;
         video.srcObject = stream;
+        var p = video.play();
+        if (p && p.catch) p.catch(function () {});
         modal.classList.add('open');
       })
-      .catch(function () {
-        showToast('Tidak bisa mengakses kamera. Izinkan akses kamera di browser.', 'error');
+      .catch(function (err) {
+        var msg = 'Tidak bisa mengakses kamera. Izinkan akses kamera di pengaturan browser.';
+        if (err && err.name === 'NotFoundError') msg = 'Kamera tidak ditemukan di perangkat ini.';
+        if (err && err.name === 'NotAllowedError') msg = 'Akses kamera ditolak. Izinkan akses kamera di pengaturan browser.';
+        showToast(msg, 'error');
       });
   }
 
   function closeCamera() {
     document.getElementById('cameraModal').classList.remove('open');
+    var video = document.getElementById('cameraVideo');
     if (cameraStream) {
       cameraStream.getTracks().forEach(function (t) { t.stop(); });
       cameraStream = null;
     }
+    if (video) video.srcObject = null;
   }
 
   function capturePhoto() {
     var video = document.getElementById('cameraVideo');
+    if (!video.videoWidth || !video.videoHeight) {
+      showToast('Kamera belum siap, coba lagi sebentar.', 'info');
+      return;
+    }
     var canvas = document.getElementById('cameraCanvas');
     var maxW = 900;
     var scale = Math.min(1, maxW / video.videoWidth);
@@ -470,13 +541,10 @@
     reader.readAsDataURL(file);
   }
 
-  // ---------- Navigasi ----------
   function showPage(page) {
     document.getElementById('pageHome').style.display = page === 'home' ? 'block' : 'none';
     document.getElementById('pageRecap').style.display = page === 'recap' ? 'block' : 'none';
 
-    // Ada beberapa tombol nav: sidebar desktop + bottom-nav mobile,
-    // semuanya memakai atribut data-nav, jadi update semuanya sekaligus.
     document.querySelectorAll('[data-nav]').forEach(function (btn) {
       btn.classList.toggle('active', btn.getAttribute('data-nav') === page);
     });
@@ -496,16 +564,13 @@
     if (page === 'recap') renderRecap();
   }
 
-  // ---------- Init / Event bindings ----------
   document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('inpTanggal').value = todayISO();
 
-    // Navigasi (sidebar desktop + bottom-nav mobile), semua pakai data-nav
     document.querySelectorAll('[data-nav]').forEach(function (btn) {
       btn.addEventListener('click', function () { showPage(btn.getAttribute('data-nav')); });
     });
 
-    // Tombol tambah transaksi (sidebar, topbar, FAB mobile), semua pakai data-add-btn
     document.querySelectorAll('[data-add-btn]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         resetForm();
@@ -537,6 +602,11 @@
 
     document.getElementById('camClose').addEventListener('click', closeCamera);
     document.getElementById('camShutter').addEventListener('click', capturePhoto);
+
+    document.getElementById('toastClose').addEventListener('click', function () {
+      document.getElementById('toast').classList.remove('show');
+      clearTimeout(showToast._t);
+    });
 
     document.getElementById('filterChips').addEventListener('click', function (e) {
       var btn = e.target.closest('.filter-chip');
