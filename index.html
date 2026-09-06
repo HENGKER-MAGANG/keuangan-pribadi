@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Catatan Keuangan Pribadi</title>
+<meta name="theme-color" content="#1d1a16" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="shell">
+
+  <!-- ===== SIDEBAR (desktop only) ===== -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon"><i class="ti ti-wallet" aria-hidden="true"></i></div>
+      <div class="brand-text">
+        <div class="brand-name">Keuangan Saya</div>
+        <div class="brand-sub">Pencatatan pribadi</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav" aria-label="Navigasi utama">
+      <button class="nav-item active" data-nav="home"><i class="ti ti-home-2" aria-hidden="true"></i> Beranda</button>
+      <button class="nav-item" data-nav="recap"><i class="ti ti-chart-bar" aria-hidden="true"></i> Rekap</button>
+    </nav>
+
+    <button class="sidebar-add-btn" data-add-btn><i class="ti ti-plus" aria-hidden="true"></i> Tambah Transaksi</button>
+
+    <a id="sheetLinkDesktop" class="sidebar-sheet-link" href="#" target="_blank" rel="noopener" style="display:none;">
+      <i class="ti ti-table" aria-hidden="true"></i> Buka Spreadsheet
+    </a>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main">
+
+    <!-- ===== TOPBAR ===== -->
+    <div class="topbar">
+      <div class="topbar-title">
+        <h1 class="mobile-only-inline"><i class="ti ti-wallet" aria-hidden="true"></i> Keuangan Saya</h1>
+        <div class="desktop-only-block">
+          <h1 id="pageTitle">Beranda</h1>
+          <p id="pageSubtitle">Ringkasan saldo &amp; riwayat transaksi Anda</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <a id="sheetLink" class="sheet-link" href="#" target="_blank" rel="noopener" style="display:none;">
+          <i class="ti ti-table" aria-hidden="true"></i> <span class="hide-xs">Spreadsheet</span>
+        </a>
+        <button class="topbar-add-btn" data-add-btn><i class="ti ti-plus" aria-hidden="true"></i> Tambah Transaksi</button>
+      </div>
+    </div>
+
+    <!-- ===== HALAMAN: BERANDA ===== -->
+    <div id="pageHome">
+      <div class="content-grid">
+        <div class="col-main">
+          <div class="balance-card">
+            <div class="label">Saldo Saat Ini</div>
+            <div class="amount" id="totalBalance">Rp 0</div>
+            <div class="row-summary">
+              <div class="chip">
+                <i class="ti ti-arrow-down-circle" aria-hidden="true"></i>
+                <div class="chip-text">
+                  <span class="chip-label">Masuk</span>
+                  <span class="chip-value" id="sumIncome">Rp 0</span>
+                </div>
+              </div>
+              <div class="chip">
+                <i class="ti ti-arrow-up-circle" aria-hidden="true"></i>
+                <div class="chip-text">
+                  <span class="chip-label">Keluar</span>
+                  <span class="chip-value" id="sumExpense">Rp 0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="filters" id="filterChips" role="tablist" aria-label="Filter periode transaksi">
+            <button class="filter-chip active" data-filter="all">Semua</button>
+            <button class="filter-chip" data-filter="today">Hari ini</button>
+            <button class="filter-chip" data-filter="week">Minggu ini</button>
+            <button class="filter-chip" data-filter="month">Bulan ini</button>
+          </div>
+
+          <div class="section-heading">
+            <h2>Riwayat Transaksi</h2>
+            <span class="muted" id="txnCount"></span>
+          </div>
+
+          <div id="txnList" class="txn-list">
+            <div class="loading-page"><div class="spinner"></div>Memuat data dari Spreadsheet...</div>
+          </div>
+        </div>
+
+        <div class="col-side">
+          <div class="panel side-panel">
+            <div class="side-panel-title"><i class="ti ti-calendar-stats" aria-hidden="true"></i> Ringkasan Bulan Ini</div>
+            <div class="mini-stat">
+              <span class="mini-stat-label">Pemasukan</span>
+              <span class="mini-stat-value income" id="miniIncome">Rp 0</span>
+            </div>
+            <div class="mini-stat">
+              <span class="mini-stat-label">Pengeluaran</span>
+              <span class="mini-stat-value expense" id="miniExpense">Rp 0</span>
+            </div>
+            <div class="mini-stat">
+              <span class="mini-stat-label">Selisih</span>
+              <span class="mini-stat-value" id="miniNet">Rp 0</span>
+            </div>
+            <div class="side-panel-divider"></div>
+            <div class="side-panel-title small"><i class="ti ti-tags" aria-hidden="true"></i> Kategori Teratas</div>
+            <div id="miniTopCategory" class="mini-top-cat">
+              <p class="muted-text">Belum ada data.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== HALAMAN: REKAP ===== -->
+    <div id="pageRecap" style="display:none;">
+      <div class="recap-cards">
+        <div class="recap-card income">
+          <div class="r-label">MASUK</div>
+          <div class="r-value" id="recapIncome">Rp 0</div>
+        </div>
+        <div class="recap-card expense">
+          <div class="r-label">KELUAR</div>
+          <div class="r-value" id="recapExpense">Rp 0</div>
+        </div>
+        <div class="recap-card net">
+          <div class="r-label">SELISIH</div>
+          <div class="r-value" id="recapNet">Rp 0</div>
+        </div>
+      </div>
+
+      <div class="content-grid">
+        <div class="col-main">
+          <div class="section-heading"><h2>Tren 7 Hari Terakhir</h2></div>
+          <div class="panel">
+            <div class="trend-row" id="trendRow"></div>
+            <div class="trend-legend">
+              <span><i class="dot income" aria-hidden="true"></i> Pemasukan</span>
+              <span><i class="dot expense" aria-hidden="true"></i> Pengeluaran</span>
+            </div>
+          </div>
+        </div>
+        <div class="col-side">
+          <div class="section-heading"><h2>Pengeluaran per Kategori</h2></div>
+          <div class="panel" id="categoryBars">
+            <div class="empty-state" style="padding:1rem;"><p>Belum ada data pengeluaran bulan ini.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+
+  <!-- ===== BOTTOM NAV (mobile only) ===== -->
+  <div class="bottom-nav" role="tablist" aria-label="Navigasi utama">
+    <button class="nav-item active" data-nav="home"><i class="ti ti-home-2" aria-hidden="true"></i>Beranda</button>
+    <button class="nav-item" data-nav="recap"><i class="ti ti-chart-bar" aria-hidden="true"></i>Rekap</button>
+  </div>
+
+  <!-- ===== FAB (mobile only) ===== -->
+  <button class="fab" data-add-btn aria-label="Tambah transaksi"><i class="ti ti-plus" aria-hidden="true"></i></button>
+
+  <!-- ===== TOAST ===== -->
+  <div class="toast-wrap" id="toastWrap" aria-live="polite">
+    <div class="toast" id="toast">
+      <div class="toast-icon"><i class="ti ti-circle-check" id="toastIcon" aria-hidden="true"></i></div>
+      <div class="toast-body">
+        <div class="toast-title" id="toastMsg"></div>
+      </div>
+      <button class="toast-close" id="toastClose" aria-label="Tutup notifikasi"><i class="ti ti-x" aria-hidden="true"></i></button>
+      <div class="toast-progress" id="toastProgress"></div>
+    </div>
+  </div>
+
+  <!-- ===== SHEET: TAMBAH TRANSAKSI ===== -->
+  <div class="overlay" id="overlayForm">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="formTitle">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <h3 id="formTitle">Tambah Transaksi</h3>
+        <button class="close-btn" id="closeForm" aria-label="Tutup"><i class="ti ti-x" aria-hidden="true"></i></button>
+      </div>
+
+      <div class="field">
+        <div class="type-toggle">
+          <button type="button" class="income active" data-type="income"><i class="ti ti-arrow-down-circle" aria-hidden="true"></i> Pemasukan</button>
+          <button type="button" class="expense" data-type="expense"><i class="ti ti-arrow-up-circle" aria-hidden="true"></i> Pengeluaran</button>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="inpJumlah">Jumlah (Rp)</label>
+          <input type="number" inputmode="numeric" class="field-input" id="inpJumlah" placeholder="0" />
+        </div>
+        <div class="field">
+          <label for="inpTanggal">Tanggal</label>
+          <input type="date" class="field-input" id="inpTanggal" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="inpKeterangan">Untuk apa? (Keterangan)</label>
+        <input type="text" class="field-input" id="inpKeterangan" placeholder="mis. Makan siang, Gaji bulanan..." />
+      </div>
+
+      <div class="field">
+        <label for="inpKategori">Kategori</label>
+        <input type="text" class="field-input" id="inpKategori" list="kategoriList" placeholder="mis. Makanan, Transport, Gaji" />
+        <datalist id="kategoriList">
+          <option value="Makanan"></option>
+          <option value="Transport"></option>
+          <option value="Belanja"></option>
+          <option value="Tagihan"></option>
+          <option value="Gaji"></option>
+          <option value="Hiburan"></option>
+          <option value="Lainnya"></option>
+        </datalist>
+      </div>
+
+      <div class="field">
+        <label id="proofLabel">Foto Bukti (opsional)</label>
+        <div id="proofArea">
+          <div class="proof-upload" id="proofEmptyState">
+            <i class="ti ti-camera icon" aria-hidden="true"></i>
+            <div class="hint">Ketuk untuk ambil foto struk/bukti</div>
+            <div class="proof-actions">
+              <button type="button" id="btnOpenCamera"><i class="ti ti-camera" aria-hidden="true"></i> Buka Kamera</button>
+              <button type="button" id="btnOpenGallery"><i class="ti ti-photo" aria-hidden="true"></i> Dari Galeri</button>
+            </div>
+          </div>
+        </div>
+        <input type="file" accept="image/*" id="fileInput" style="display:none;" aria-labelledby="proofLabel" />
+      </div>
+
+      <button class="submit-btn" id="btnSubmit"><i class="ti ti-check" aria-hidden="true"></i> Simpan Transaksi</button>
+    </div>
+  </div>
+
+  <!-- ===== SHEET: DETAIL TRANSAKSI ===== -->
+  <div class="overlay" id="overlayDetail">
+    <div class="sheet sheet-sm" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <h3 id="detailTitle">Detail Transaksi</h3>
+        <button class="close-btn" id="closeDetail" aria-label="Tutup"><i class="ti ti-x" aria-hidden="true"></i></button>
+      </div>
+      <div id="detailBody"></div>
+      <button class="btn-outline btn-danger" id="btnDelete" style="margin-top:8px;">
+        <i class="ti ti-trash" aria-hidden="true"></i> Hapus Transaksi
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== KAMERA LANGSUNG ===== -->
+  <div class="camera-modal" id="cameraModal">
+    <div class="camera-modal-inner">
+      <video id="cameraVideo" autoplay playsinline muted></video>
+      <div class="camera-controls">
+        <button class="cam-close" id="camClose" aria-label="Tutup kamera"><i class="ti ti-x" aria-hidden="true"></i></button>
+        <button class="cam-shutter" id="camShutter" aria-label="Ambil foto"></button>
+        <div class="cam-spacer"></div>
+      </div>
+    </div>
+  </div>
+  <canvas id="cameraCanvas" style="display:none;"></canvas>
+
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
